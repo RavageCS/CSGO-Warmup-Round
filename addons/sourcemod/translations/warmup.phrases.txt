@@ -1,0 +1,12 @@
+"Phrases"
+{
+	"warmup time"
+	{
+		"en"			"Warmup Round Ending"
+	}
+	
+	"warmup pause"
+	{
+		"en"			"Warmup Waiting for players"
+	}
+}
