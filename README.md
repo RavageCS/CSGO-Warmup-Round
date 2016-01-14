@@ -15,4 +15,5 @@ https://forums.alliedmods.net/showthread.php?t=225883
 ## Weapons:
 
 Random weapon: random
+
 Classic weapon: knife, glock, hkp2000, p250, deagle, elite, fiveseven, tec9, nova, xm1014, mag7, bizon, sawedoff, mac10, mp9, mp7, ump45, p90, galilar, ak47, scar20, famas, m4a1, aug, ssg08, sg556, awp, g3sg1, m249, negev, hegrenade, taser
