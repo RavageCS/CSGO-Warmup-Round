@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 #include <cstrike>
-#define VERSION "2.4.0"
+#define VERSION "3.0.0"
 
 public Plugin:myinfo =
 {
@@ -41,8 +41,8 @@ new Handle:g_warmuptimer = INVALID_HANDLE;
 
 new g_iMyWeapons;
 
-#define WEAPON_NB 32
-new String:g_sWeaponsNamesGame[WEAPON_NB][] = {"knife","glock","hkp2000","p250","deagle","elite","fiveseven","tec9","nova","xm1014","mag7","bizon","sawedoff","mac10","mp9","mp7","ump45","p90","galilar","ak47","scar20","famas","m4a1","aug","ssg08","sg556","awp","g3sg1","m249","negev","hegrenade","taser"};
+#define WEAPON_NB 33
+new String:g_sWeaponsNamesGame[WEAPON_NB][] = {"knife","glock","hkp2000","p250","deagle","elite","fiveseven","tec9","nova","xm1014","mag7","bizon","sawedoff","mac10","mp9","mp7","ump45","p90","galilar","ak47","scar20","famas","m4a1","aug","ssg08","sg556","awp","g3sg1","m249","negev","hegrenade","taser", "revolver"};
 
 public OnPluginStart()
 {
@@ -50,7 +50,8 @@ public OnPluginStart()
   CreateConVar("sm_warmupround_version", VERSION, "Warmup Round Version", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY|FCVAR_DONTRECORD);
   g_Cvaractive = CreateConVar("sm_warmupround_active", "0", "DO NOT MODIFY THIS VALUE DIRECTLY - USED FOR STATS TRACKING", FCVAR_DONTRECORD);
   g_Cvarenabled = CreateConVar("sm_warmupround_enabled", "1", "Enable this plugin. 0 = Disabled");
-  // g_Cvartime = CreateConVar("sm_warmupround_time", "30", "Time in seconds for the warmup to last.  Minimum 15.", _, true, 15.0, true, 120.0);
+  g_Cvartime = CreateConVar("sm_warmupround_time", "20", "Time in seconds for the warmup to last");
+  //g_pause_warmup CreateConvar("sm_warmupround_end_players", "2" "Pause warmup until this many players join");
   g_Cvartime = FindConVar("mp_warmuptime");
   g_CvarPaused = FindConVar("mp_warmup_pausetimer");
   g_Cvarweapon = CreateConVar("sm_warmupround_weapon", "hegrenade", "Weapon to give players during warmup.  HEGrenades are unlimted.  Examples: knife,deagle,fiveseven,elite,hkp2000,random..");
@@ -61,10 +62,11 @@ public OnPluginStart()
   g_Cvarpostexec = CreateConVar("sm_warmupround_postexec", "", "Config file to execute after warmup round has ended.  File goes in /cfg/ directory.  (Example: 'postwarmup.cfg' | Leave blank for none)");
   GetLanguageInfo(GetServerLanguage(), languagecode, sizeof(languagecode), language, sizeof(language));
 
+  HookEvent("player_spawn", EventPlayerSpawn, EventHookMode_Post);
   HookEvent("player_death", EventPlayerDeath, EventHookMode_Post);
-  HookEvent("item_pickup", EventItemPickup, EventHookMode_Post);
+  HookEvent("weapon_fire_on_empty", EventWeaponFireOnEmpty, EventHookMode_Pre);
   HookEvent("weapon_fire", EventWeaponFire, EventHookMode_Post);
-  HookEvent("weapon_fire_on_empty", EventWeaponFireOnEmpty, EventHookMode_Post);
+  HookEvent("weapon_reload", EventWeaponReload, EventHookMode_Pre);
   
   HookConVarChange(g_Cvarenabled, OnSettingChanged);
   HookConVarChange(g_Cvartime, OnSettingChanged);
@@ -296,34 +298,16 @@ public Action:Countdown(Handle:timer)
   	return Plugin_Continue;
 }
 
-public Action:DelayWeapon(Handle:timer, any:client)
-{
-  if(IsClientInGame(client))
-  {
-    WeaponHandler(client);
-  }
-}
-
-public Action:SpawnPlayer(Handle:timer, any:client)
-{
-  if (IsClientInGame(client))
-  {
-    CS_RespawnPlayer(client);
-  }
-}
-
-public EventItemPickup(Handle:event, const String:name[],bool:dontBroadcast)
+public EventPlayerSpawn(Handle:event, const String:name[],bool:dontBroadcast)
 {
 	if (g_enabled && IsWarmup)
-  {
-    new clientid = GetClientOfUserId(GetEventInt(event, "userid"));
-    new String:item[32];
-    GetEventString(event, "item", item, sizeof(item));
-    if (!StrEqual(item, g_weapon, false))
-    {
-      CreateTimer(0.1, DelayWeapon, clientid);
-    }
-  }
+  	{
+    		new client = GetClientOfUserId(GetEventInt(event, "userid"));
+		if(IsClientInGame(client))
+  		{
+    			WeaponHandler(client);
+		}
+  	}
 }
 
 public EventWeaponFire(Handle:event,const String:name[],bool:dontBroadcast)
@@ -332,31 +316,55 @@ public EventWeaponFire(Handle:event,const String:name[],bool:dontBroadcast)
   {
     if (StrEqual(g_weapon, "hegrenade", false) || StrEqual(g_weapon, "taser", false) || StrEqual(g_weapon, "random", false))
     {
-      new clientid = GetClientOfUserId(GetEventInt(event, "userid"));
-      //new String:weapon[32];
-      //GetEventString(event, "weapon", weapon, sizeof(weapon));
+      new client = GetClientOfUserId(GetEventInt(event, "userid"));
       if (StrEqual(g_weapon, "hegrenade", false) || StrEqual(g_weapon, "taser", false))
       {
-        CreateTimer(0.2, DelayWeapon, clientid);
+        if(IsClientInGame(client))
+  	{
+    		WeaponHandler(client);
+  	}
       }
     }
   }
+}
+
+public EventWeaponReload(Handle:event,const String:name[],bool:dontBroadcast)
+{
+	if (g_enabled && IsWarmup)
+	{
+		new client = GetClientOfUserId(GetEventInt(event, "userid"));
+		if(IsClientInGame(client))
+  		{
+    			WeaponHandler(client);
+  		}
+	}
 }
 
 public EventWeaponFireOnEmpty(Handle:event,const String:name[],bool:dontBroadcast)
 {
 	if (g_enabled && IsWarmup)
 	{
-		new clientid = GetClientOfUserId(GetEventInt(event, "userid"));
-		CreateTimer(0.2, DelayWeapon, clientid);
+		new client = GetClientOfUserId(GetEventInt(event, "userid"));
+		if(IsClientInGame(client))
+  		{
+    			WeaponHandler(client);
+  		}
 	}
-}
+}	
 	
 public EventPlayerDeath(Handle:event,const String:name[],bool:dontBroadcast)
 {
   if (g_enabled && IsWarmup && g_respawn)
   {
-    new clientid = GetClientOfUserId(GetEventInt(event, "userid"));
-    CreateTimer(0.2, SpawnPlayer, clientid);
+    new client = GetClientOfUserId(GetEventInt(event, "userid"));
+    CreateTimer(0.1, SpawnPlayer, client);
+  }
+}
+
+public Action:SpawnPlayer(Handle:timer, any:client)
+{
+  if (IsClientInGame(client))
+  {
+    CS_RespawnPlayer(client);
   }
 }  
