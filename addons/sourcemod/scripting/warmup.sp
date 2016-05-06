@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 #include <cstrike>
-#define VERSION "3.0.0"
+#define VERSION "3.1.1"
 
 public Plugin:myinfo =
 {
@@ -41,8 +41,9 @@ new Handle:g_warmuptimer = INVALID_HANDLE;
 
 new g_iMyWeapons;
 
-#define WEAPON_NB 33
-new String:g_sWeaponsNamesGame[WEAPON_NB][] = {"knife","glock","hkp2000","p250","deagle","elite","fiveseven","tec9","nova","xm1014","mag7","bizon","sawedoff","mac10","mp9","mp7","ump45","p90","galilar","ak47","scar20","famas","m4a1","aug","ssg08","sg556","awp","g3sg1","m249","negev","hegrenade","taser", "revolver"};
+#define WEAPON_NB 34
+new String:g_sWeaponsNamesGame[WEAPON_NB][] = {"knife","glock","hkp2000","p250","deagle","elite","fiveseven","tec9","nova","xm1014","mag7","bizon","sawedoff","mac10","mp9","mp7","ump45","p90","galilar",
+						"ak47","scar20","famas","m4a1","aug","ssg08","sg556","awp","g3sg1","m249","negev","hegrenade","decoy","taser", "revolver"};
 
 public OnPluginStart()
 {
@@ -236,38 +237,7 @@ public Action:CancelWarmup()
   {
     ServerCommand("mp_friendlyfire 1");
   }
-}  
-
-WeaponHandler(client)
-{
-  if (IsWarmup && client != 0)
-  {
-    new String:buffer[32];
-    static Slot = 0, EntityIndex = 0;
-    decl String:WeaponClass[64] = "";
-    for (Slot = 0; Slot <= 10; Slot += 1)
-    {
-      EntityIndex = GetEntDataEnt2(client, (g_iMyWeapons + Slot));
-      if (EntityIndex != 0 && IsValidEdict(EntityIndex))
-      {
-        GetEdictClassname(EntityIndex, WeaponClass, sizeof(WeaponClass));
-        if (StrEqual(WeaponClass, "worldspawn", false))
-        {
-          return;
-        }
-        RemovePlayerItem(client, EntityIndex);
-        RemoveEdict(EntityIndex);
-      }
-    }
-    if (strlen(g_weapon) > 2)
-    {
-      Format(buffer, sizeof(buffer), "weapon_%s", g_weapon);
-      GivePlayerItem(client, buffer);
-    }
-    Slot = 0;
-    EntityIndex = 0;
-  }
-}
+} 
 
 public Action:Countdown(Handle:timer)
 {
@@ -296,6 +266,51 @@ public Action:Countdown(Handle:timer)
     		return Plugin_Stop;
   	}
   	return Plugin_Continue;
+} 
+
+RemoveWeapon(client)
+{
+	if (IsWarmup && client != 0)
+  	{
+    		static Slot = 0, EntityIndex = 0;
+    		decl String:WeaponClass[64] = "";
+    		for (Slot = 0; Slot <= 10; Slot += 1)
+    		{
+      			EntityIndex = GetEntDataEnt2(client, (g_iMyWeapons + Slot));
+      			if (EntityIndex != 0 && IsValidEdict(EntityIndex))
+      			{
+        			GetEdictClassname(EntityIndex, WeaponClass, sizeof(WeaponClass));
+        			if (StrEqual(WeaponClass, "worldspawn", false))
+        			{
+          				return;
+        			}
+        			RemovePlayerItem(client, EntityIndex);
+        			RemoveEdict(EntityIndex);
+      			}
+    		}
+  	}	
+}
+
+GiveWeapon(client)
+{
+	if (IsWarmup && client != 0)
+  	{
+    		if (strlen(g_weapon) > 2)
+    		{
+      			new String:buffer[32];
+			Format(buffer, sizeof(buffer), "weapon_%s", g_weapon);
+      			GivePlayerItem(client, buffer);
+    		}
+	}
+}
+
+public Action:DelayWeapon(Handle:timer, any:client)
+{
+	if(IsClientInGame(client))
+  	{
+		RemoveWeapon(client);
+    		GiveWeapon(client);
+  	}
 }
 
 public EventPlayerSpawn(Handle:event, const String:name[],bool:dontBroadcast)
@@ -305,27 +320,29 @@ public EventPlayerSpawn(Handle:event, const String:name[],bool:dontBroadcast)
     		new client = GetClientOfUserId(GetEventInt(event, "userid"));
 		if(IsClientInGame(client))
   		{
-    			WeaponHandler(client);
+			if (StrEqual(g_weapon, "decoy", false))
+    			{
+				SetEntityHealth(client, 1);
+			}
+    			RemoveWeapon(client);
+			GiveWeapon(client);
 		}
   	}
 }
 
 public EventWeaponFire(Handle:event,const String:name[],bool:dontBroadcast)
 {
-  if (g_enabled && IsWarmup)
-  {
-    if (StrEqual(g_weapon, "hegrenade", false) || StrEqual(g_weapon, "taser", false) || StrEqual(g_weapon, "random", false))
-    {
-      new client = GetClientOfUserId(GetEventInt(event, "userid"));
-      if (StrEqual(g_weapon, "hegrenade", false) || StrEqual(g_weapon, "taser", false))
-      {
-        if(IsClientInGame(client))
+	if (g_enabled && IsWarmup)
   	{
-    		WeaponHandler(client);
+    		if (StrEqual(g_weapon, "hegrenade", false) || StrEqual(g_weapon, "taser", false) || StrEqual(g_weapon, "decoy", false))
+    		{
+      			new client = GetClientOfUserId(GetEventInt(event, "userid"));
+        		if(IsClientInGame(client))
+  			{
+    				CreateTimer(0.2, DelayWeapon, client);
+  			}
+    		}
   	}
-      }
-    }
-  }
 }
 
 public EventWeaponReload(Handle:event,const String:name[],bool:dontBroadcast)
@@ -335,7 +352,8 @@ public EventWeaponReload(Handle:event,const String:name[],bool:dontBroadcast)
 		new client = GetClientOfUserId(GetEventInt(event, "userid"));
 		if(IsClientInGame(client))
   		{
-    			WeaponHandler(client);
+    			RemoveWeapon(client);
+			GiveWeapon(client);
   		}
 	}
 }
@@ -347,7 +365,8 @@ public EventWeaponFireOnEmpty(Handle:event,const String:name[],bool:dontBroadcas
 		new client = GetClientOfUserId(GetEventInt(event, "userid"));
 		if(IsClientInGame(client))
   		{
-    			WeaponHandler(client);
+    			RemoveWeapon(client);
+			GiveWeapon(client);
   		}
 	}
 }	
