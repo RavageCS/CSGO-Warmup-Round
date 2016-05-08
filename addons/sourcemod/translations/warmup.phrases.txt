@@ -2,10 +2,11 @@
 {
 	"warmup time"
 	{
-		"en"			"Warmup Ending \n TopSecretGaming.net"
+		"en"			"Warmup Round Ending"
 	}
+	
 	"warmup pause"
 	{
-		"en"			"Warmup Mode Enabled \n Retakes: Waiting for 1 Player \n TopSecretGaming.net"
+		"en"			"Warmup Waiting for players"
 	}
 }
